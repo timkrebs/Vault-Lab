@@ -142,6 +142,9 @@ If you're experiencing workflow failures, see **[GITHUB-ACTIONS-FIXES.md](GITHUB
 ### **AWS Credentials in HCP Terraform?**
 If your AWS credentials are in HCP Terraform and you don't want to duplicate them in GitHub, see **[TERRAFORM-CLOUD-CREDENTIALS.md](TERRAFORM-CLOUD-CREDENTIALS.md)** for the solution using remote operations.
 
+### **Terraform Template Variable Issues?**
+If you're getting "vars map does not contain key" errors, see **[TEMPLATEFILE-VARIABLE-FIX.md](TEMPLATEFILE-VARIABLE-FIX.md)** for the solution to template variable escaping.
+
 ## 🚀 Quick Start with GitHub Actions
 
 1. **Fork this repository**
