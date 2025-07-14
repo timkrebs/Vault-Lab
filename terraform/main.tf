@@ -13,7 +13,24 @@ data "aws_vpc" "selected" {
   id = var.vpc_id
 }
 
+data "aws_caller_identity" "current" {}
 
+# KMS key for Vault auto-unseal
+resource "aws_kms_key" "vault" {
+  description             = "KMS key for ${var.project_name} Vault auto-unseal"
+  deletion_window_in_days = 7
+
+  tags = {
+    Name        = "${var.project_name}-vault-kms"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+resource "aws_kms_alias" "vault" {
+  name          = "alias/${var.project_name}-vault"
+  target_key_id = aws_kms_key.vault.key_id
+}
 
 # Security Group for Vault
 resource "aws_security_group" "vault" {
@@ -22,8 +39,8 @@ resource "aws_security_group" "vault" {
 
   # Vault API
   ingress {
-    from_port   = 8200
-    to_port     = 8200
+    from_port   = var.vault_port
+    to_port     = var.vault_port
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.selected.cidr_block]
   }
@@ -41,7 +58,7 @@ resource "aws_security_group" "vault" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [data.aws_vpc.selected.cidr_block]
+    cidr_blocks = var.admin_cidr_blocks
   }
 
   egress {
@@ -104,7 +121,17 @@ resource "aws_iam_role_policy" "vault" {
           "kms:Decrypt",
           "kms:DescribeKey"
         ]
-        Resource = "*"
+        Resource = aws_kms_key.vault.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:DeleteParameter"
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/vault/${var.environment}/*"
       }
     ]
   })
@@ -130,6 +157,8 @@ resource "aws_launch_template" "vault" {
   user_data = base64encode(templatefile("${path.module}/../scripts/user_data.sh", {
     vault_cluster_size = var.vault_cluster_size
     environment       = var.environment
+    kms_key_id        = aws_kms_key.vault.key_id
+    aws_region        = var.aws_region
   }))
 
   tag_specifications {
@@ -211,7 +240,7 @@ resource "aws_autoscaling_group" "vault" {
 # Application Load Balancer for Vault
 resource "aws_lb" "vault" {
   name               = "${var.project_name}-vault-alb"
-  internal           = true
+  internal           = !var.enable_public_access
   load_balancer_type = "application"
   security_groups    = [aws_security_group.vault_alb.id]
   subnets            = var.subnet_ids
@@ -234,10 +263,10 @@ resource "aws_security_group" "vault_alb" {
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = 8200
-    to_port     = 8200
+    from_port   = var.vault_port
+    to_port     = var.vault_port
     protocol    = "tcp"
-    cidr_blocks = [data.aws_vpc.selected.cidr_block]
+    cidr_blocks = var.enable_public_access ? var.allowed_cidr_blocks : [data.aws_vpc.selected.cidr_block]
   }
 
   egress {
@@ -256,7 +285,7 @@ resource "aws_security_group" "vault_alb" {
 
 resource "aws_lb_target_group" "vault" {
   name     = "${var.project_name}-vault-tg"
-  port     = 8200
+  port     = var.vault_port
   protocol = "HTTP"
   vpc_id   = var.vpc_id
 
@@ -280,7 +309,7 @@ resource "aws_lb_target_group" "vault" {
 
 resource "aws_lb_listener" "vault" {
   load_balancer_arn = aws_lb.vault.arn
-  port              = "8200"
+  port              = var.vault_port
   protocol          = "HTTP"
 
   default_action {

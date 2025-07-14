@@ -8,9 +8,9 @@ terraform {
     }
   }
 
-  # HCP Terraform configuration
-  cloud {
-    organization = "tim-krebs-org"  # Replace with your HCP Terraform organization
+  # Remote backend configuration for Terraform Cloud CLI workflow
+  backend "remote" {
+    organization = "tim-krebs-org"  # Replace with your Terraform Cloud organization
     
     workspaces {
       name = "vault-lab"  # Replace with your desired workspace name

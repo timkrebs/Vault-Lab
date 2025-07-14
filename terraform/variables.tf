@@ -57,4 +57,29 @@ variable "additional_tags" {
   description = "Additional tags to apply to resources"
   type        = map(string)
   default     = {}
+}
+
+# New variables for connectivity
+variable "enable_public_access" {
+  description = "Enable public access to Vault (internet-facing ALB)"
+  type        = bool
+  default     = true
+}
+
+variable "allowed_cidr_blocks" {
+  description = "CIDR blocks allowed to access Vault (use ['0.0.0.0/0'] for public access)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "admin_cidr_blocks" {
+  description = "CIDR blocks allowed SSH access to Vault instances"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]  # Restrict this in production
+}
+
+variable "vault_port" {
+  description = "Port for Vault API"
+  type        = number
+  default     = 8200
 } 
