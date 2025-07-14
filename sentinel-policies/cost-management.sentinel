@@ -1,0 +1,126 @@
+import "tfplan/v2" as tfplan
+import "decimal"
+import "strings"
+
+# Cost limits (monthly estimates)
+max_monthly_cost = 100.0  # $100 per month
+max_hourly_cost = 5.0     # $5 per hour
+
+# Instance type cost limits (approximate hourly costs)
+instance_cost_limits = {
+    "t3.nano":    0.0052,
+    "t3.micro":   0.0104,
+    "t3.small":   0.0208,
+    "t3.medium":  0.0416,
+    "t3.large":   0.0832,
+    "t3.xlarge":  0.1664,
+    "m5.large":   0.096,
+    "m5.xlarge":  0.192,
+    "m5.2xlarge": 0.384,
+    "m5.4xlarge": 0.768,
+}
+
+# Allowed instance types for cost savings
+allowed_instance_types = [
+    "t3.nano", "t3.micro", "t3.small", "t3.medium", "t3.large",
+    "m5.large"  # Allow m5.large for Vault but warn about cost
+]
+
+# Function to validate instance types and costs
+validate_ec2_instances = func() {
+    violations = []
+    
+    for tfplan.resource_changes as _, rc {
+        if rc.type is "aws_instance" or rc.type is "aws_launch_template" {
+            if rc.mode is "managed" and rc.change.actions contains "create" {
+                
+                # Get instance type
+                instance_type = null
+                if "instance_type" in rc.change.after {
+                    instance_type = rc.change.after.instance_type
+                }
+                
+                if instance_type is not null {
+                    # Check if instance type is allowed
+                    if instance_type not in allowed_instance_types {
+                        violations append {
+                            "resource": rc.address,
+                            "type": "disallowed_instance_type",
+                            "message": "Instance type '" + instance_type + "' is not allowed for cost savings. Allowed types: " + strings.join(allowed_instance_types, ", "),
+                        }
+                    }
+                    
+                    # Check cost limit
+                    if instance_type in instance_cost_limits {
+                        hourly_cost = instance_cost_limits[instance_type]
+                        if hourly_cost > max_hourly_cost {
+                            violations append {
+                                "resource": rc.address,
+                                "type": "cost_limit_exceeded",
+                                "message": "Instance type '" + instance_type + "' costs $" + string(hourly_cost) + "/hour, exceeding limit of $" + string(max_hourly_cost) + "/hour",
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return violations
+}
+
+# Function to check for expensive resources
+check_expensive_resources = func() {
+    violations = []
+    
+    for tfplan.resource_changes as _, rc {
+        if rc.mode is "managed" and rc.change.actions contains "create" {
+            # Block expensive RDS instances
+            if rc.type is "aws_db_instance" {
+                violations append {
+                    "resource": rc.address,
+                    "type": "expensive_resource",
+                    "message": "RDS instances are expensive. Consider using DynamoDB or external managed databases for cost savings.",
+                }
+            }
+            
+            # Block NAT Gateways (expensive)
+            if rc.type is "aws_nat_gateway" {
+                violations append {
+                    "resource": rc.address,
+                    "type": "expensive_resource", 
+                    "message": "NAT Gateways cost $45+/month. Consider using NAT instances or public subnets for cost savings.",
+                }
+            }
+            
+            # Warn about ELB/ALB costs
+            if rc.type is "aws_lb" or rc.type is "aws_elb" {
+                if "load_balancer_type" in rc.change.after {
+                    lb_type = rc.change.after.load_balancer_type
+                    if lb_type is "application" or lb_type is "network" {
+                        print("💰 COST WARNING: " + rc.address + " - ALB/NLB costs ~$16+/month. Consider using Classic LB for development.")
+                    }
+                }
+            }
+        }
+    }
+    
+    return violations
+}
+
+# Main validation
+violations = validate_ec2_instances() + check_expensive_resources()
+
+# Print violations
+for violations as violation {
+    print("❌ COST POLICY VIOLATION:")
+    print("   Resource: " + violation.resource)
+    print("   Type: " + violation.type) 
+    print("   Message: " + violation.message)
+    print("")
+}
+
+# Policy result
+main = rule {
+    length(violations) is 0
+} 

@@ -1,0 +1,178 @@
+import "tfplan/v2" as tfplan
+import "time"
+import "strings"
+
+# TTL Configuration
+default_ttl_hours = 24      # 24 hours default
+max_ttl_hours = 168         # 7 days maximum
+required_ttl_tag = "ttl"    # Tag name for TTL
+created_at_tag = "created_at"
+
+# Function to get current timestamp
+get_current_time = func() {
+    return time.now_utc()
+}
+
+# Function to calculate expiry time
+calculate_expiry_time = func(ttl_hours) {
+    current_time = get_current_time()
+    ttl_seconds = ttl_hours * 3600
+    expiry_time = time.add(current_time, ttl_seconds)
+    return time.format(expiry_time, "2006-01-02T15:04:05Z")
+}
+
+# Function to validate and enforce TTL tags
+validate_ttl_tags = func() {
+    violations = []
+    
+    # Resources that should have TTL tags
+    ttl_required_resources = [
+        "aws_instance",
+        "aws_launch_template", 
+        "aws_autoscaling_group",
+        "aws_lb",
+        "aws_db_instance",
+        "aws_rds_cluster",
+        "aws_elasticache_cluster",
+        "aws_eks_cluster",
+        "aws_ecs_cluster"
+    ]
+    
+    for tfplan.resource_changes as _, rc {
+        if rc.type in ttl_required_resources {
+            if rc.mode is "managed" and rc.change.actions contains "create" {
+                
+                # Check if resource has tags
+                tags = null
+                if "tags" in rc.change.after {
+                    tags = rc.change.after.tags
+                } else if "tag" in rc.change.after {
+                    # Handle resources that use tag blocks instead of tags map
+                    tag_blocks = rc.change.after.tag
+                    tags = {}
+                    for tag_blocks as tag {
+                        if "key" in tag and "value" in tag {
+                            tags[tag.key] = tag.value
+                        }
+                    }
+                }
+                
+                if tags is null {
+                    violations append {
+                        "resource": rc.address,
+                        "type": "missing_tags",
+                        "message": "Resource must have tags defined for TTL enforcement",
+                        "suggested_tags": get_suggested_ttl_tags(default_ttl_hours),
+                    }
+                } else {
+                    # Check for TTL tag
+                    if required_ttl_tag not in tags {
+                        violations append {
+                            "resource": rc.address,
+                            "type": "missing_ttl_tag",
+                            "message": "Resource must have '" + required_ttl_tag + "' tag for auto-deletion. Example: ttl = '24h'",
+                            "suggested_tags": get_suggested_ttl_tags(default_ttl_hours),
+                        }
+                    } else {
+                        # Validate TTL format and value
+                        ttl_value = tags[required_ttl_tag]
+                        ttl_hours = parse_ttl_value(ttl_value)
+                        
+                        if ttl_hours is null {
+                            violations append {
+                                "resource": rc.address,
+                                "type": "invalid_ttl_format",
+                                "message": "Invalid TTL format '" + ttl_value + "'. Use format like '24h', '7d', or '168h'",
+                            }
+                        } else if ttl_hours > max_ttl_hours {
+                            violations append {
+                                "resource": rc.address,
+                                "type": "ttl_too_long",
+                                "message": "TTL of " + string(ttl_hours) + "h exceeds maximum of " + string(max_ttl_hours) + "h (7 days)",
+                            }
+                        }
+                    }
+                    
+                    # Check for created_at tag
+                    if created_at_tag not in tags {
+                        print("⚠️  WARNING: " + rc.address + " missing '" + created_at_tag + "' tag. Auto-deletion may not work properly.")
+                    }
+                }
+            }
+        }
+    }
+    
+    return violations
+}
+
+# Function to parse TTL value (supports 1h, 24h, 7d, etc.)
+parse_ttl_value = func(ttl_string) {
+    if strings.has_suffix(ttl_string, "h") {
+        hour_str = strings.trim_suffix(ttl_string, "h")
+        return decimal.new(hour_str)
+    } else if strings.has_suffix(ttl_string, "d") {
+        day_str = strings.trim_suffix(ttl_string, "d") 
+        days = decimal.new(day_str)
+        return days * 24
+    } else if strings.has_suffix(ttl_string, "m") {
+        minute_str = strings.trim_suffix(ttl_string, "m")
+        minutes = decimal.new(minute_str)
+        return minutes / 60
+    }
+    
+    # Try parsing as pure number (assume hours)
+    return decimal.new(ttl_string)
+}
+
+# Function to generate suggested TTL tags
+get_suggested_ttl_tags = func(hours) {
+    current_time = get_current_time()
+    formatted_time = time.format(current_time, "2006-01-02T15:04:05Z")
+    expiry_time = calculate_expiry_time(hours)
+    
+    return {
+        required_ttl_tag: string(hours) + "h",
+        created_at_tag: formatted_time,
+        "expires_at": expiry_time,
+        "environment": "dev",
+        "auto_delete": "true",
+        "owner": "terraform"
+    }
+}
+
+# Function to print helpful TTL information
+print_ttl_info = func() {
+    print("🕐 TTL AUTO-DELETE POLICY ACTIVE")
+    print("   • Default TTL: " + string(default_ttl_hours) + " hours")
+    print("   • Maximum TTL: " + string(max_ttl_hours) + " hours (7 days)")
+    print("   • Required tag: '" + required_ttl_tag + "' (format: '24h', '7d')")
+    print("   • Tracking tag: '" + created_at_tag + "' (auto-generated)")
+    print("   • Resources will be auto-deleted after TTL expires")
+    print("")
+}
+
+# Main validation
+violations = validate_ttl_tags()
+
+# Print TTL information
+print_ttl_info()
+
+# Print violations
+for violations as violation {
+    print("❌ TTL POLICY VIOLATION:")
+    print("   Resource: " + violation.resource)
+    print("   Type: " + violation.type)
+    print("   Message: " + violation.message)
+    if "suggested_tags" in violation {
+        print("   Suggested tags:")
+        for violation.suggested_tags as key, value {
+            print("     " + key + " = \"" + string(value) + "\"")
+        }
+    }
+    print("")
+}
+
+# Policy result - enforce TTL tags
+main = rule {
+    length(violations) is 0
+} 

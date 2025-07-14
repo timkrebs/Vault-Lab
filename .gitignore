@@ -1,0 +1,33 @@
+# Binaries
+binaries/
+*.zip
+*.tar.gz
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!terraform.tfvars.example
+
+# Packer
+packer_cache/
+*.box
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local 
