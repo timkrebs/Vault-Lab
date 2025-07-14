@@ -159,6 +159,7 @@ resource "aws_launch_template" "vault" {
     environment       = var.environment
     kms_key_id        = aws_kms_key.vault.key_id
     aws_region        = var.aws_region
+    vault_config      = base64encode(file("${path.module}/../files/vault.hcl"))
   }))
 
   tag_specifications {

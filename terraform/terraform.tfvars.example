@@ -1,0 +1,38 @@
+# Terraform Variables Example
+# Copy this file to terraform.tfvars and customize for your environment
+
+# AWS Configuration
+aws_region = "us-east-1"
+vpc_id     = "vpc-0dd7e9c9a5991c3be"  # Replace with your VPC ID
+subnet_ids = [
+  "subnet-081957444ccb77028",  # Replace with your subnet IDs
+  "subnet-0960fb8a4d44c769b"   # At least 2 subnets in different AZs
+]
+
+# Project Configuration
+project_name = "vault-lab"
+environment  = "dev"
+
+# Vault Cluster Configuration
+vault_cluster_size = 3
+instance_type     = "m5.large"
+vault_port        = 8200
+
+# Connectivity Configuration
+enable_public_access = true  # Set to false for private-only access
+allowed_cidr_blocks  = [
+  "0.0.0.0/0"  # WARNING: This allows access from anywhere. Restrict in production!
+]
+admin_cidr_blocks = [
+  "0.0.0.0/0"  # WARNING: This allows SSH from anywhere. Restrict to your IP!
+]
+
+# Resource Management
+resource_ttl = "24h"  # Auto-delete resources after 24 hours
+
+# Additional Tags (optional)
+additional_tags = {
+  Owner       = "your-name"
+  Purpose     = "vault-lab"
+  CostCenter  = "engineering"
+} 

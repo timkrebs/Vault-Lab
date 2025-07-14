@@ -15,8 +15,10 @@ VAULT_CLUSTER_SIZE=${vault_cluster_size}
 ENVIRONMENT=${environment}
 KMS_KEY_ID=${kms_key_id}
 AWS_REGION=${aws_region}
+VAULT_CONFIG_B64="${vault_config}"
 
 # Create vault configuration from template
+echo "$VAULT_CONFIG_B64" | base64 -d > /tmp/vault.hcl
 sudo cp /tmp/vault.hcl /etc/vault.d/vault.hcl
 
 # Substitute variables in vault config
