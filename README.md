@@ -1,6 +1,6 @@
-# Vault Lab - HCP Terraform Integration
+# Vault Lab - GitHub Actions & Terraform Cloud Integration
 
-This project provides infrastructure-as-code for deploying HashiCorp Vault clusters on AWS using both Packer (for AMI building) and Terraform (for infrastructure provisioning) with HCP Terraform integration.
+This project provides infrastructure-as-code for deploying HashiCorp Vault clusters on AWS using GitHub Actions, Packer (for AMI building), and Terraform with CLI-based deployment and external connectivity options.
 
 ## Project Structure
 
@@ -121,11 +121,51 @@ After successful deployment:
 
 ## Key Features
 
+- **GitHub Actions CI/CD**: Automated deployment pipeline with Terraform
+- **External Connectivity**: Configurable public/private access to Vault
+- **Auto-Initialization**: Automatic Vault initialization with secure credential storage
 - **High Availability**: Multi-node Vault cluster with Raft storage
 - **Auto Scaling**: EC2 Auto Scaling Group maintains desired cluster size
 - **Load Balancing**: Application Load Balancer for Vault API access
-- **Security**: Security groups, IAM roles, and AWS KMS integration
+- **KMS Auto-Unseal**: Automatic unsealing using AWS KMS
+- **Security**: Security groups, IAM roles, and configurable access controls
 - **Monitoring**: Health checks and auto-recovery
+
+## 🚨 Common Setup Questions
+
+### **GitHub Actions Issues?**
+If you're experiencing workflow failures, see **[GITHUB-ACTIONS-FIXES.md](GITHUB-ACTIONS-FIXES.md)** for solutions to:
+- Deprecated `set-output` command errors  
+- Terraform exit code 3 issues
+- Action version compatibility problems
+
+### **AWS Credentials in HCP Terraform?**
+If your AWS credentials are in HCP Terraform and you don't want to duplicate them in GitHub, see **[TERRAFORM-CLOUD-CREDENTIALS.md](TERRAFORM-CLOUD-CREDENTIALS.md)** for the solution using remote operations.
+
+## 🚀 Quick Start with GitHub Actions
+
+1. **Fork this repository**
+2. **Set up Terraform Cloud**:
+   - Create organization and workspace
+   - Add AWS credentials as environment variables
+3. **Add GitHub secret**: `TF_API_TOKEN` (from Terraform Cloud)
+4. **Configure variables**: Copy `terraform/terraform.tfvars.example` to `terraform.tfvars`
+5. **Push to main branch** - automatic deployment starts!
+
+### Accessing Your Deployed Vault
+
+```bash
+# Get outputs after deployment
+cd terraform && terraform output
+
+# Retrieve root token
+ROOT_TOKEN=$(aws ssm get-parameter --region us-east-1 --name "/vault/dev/root-token" --with-decryption --query 'Parameter.Value' --output text)
+
+# Connect to Vault
+export VAULT_ADDR="http://your-alb-dns:8200"
+export VAULT_TOKEN="$ROOT_TOKEN"
+vault status
+```
 
 ## Vault Configuration
 

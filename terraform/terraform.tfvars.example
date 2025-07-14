@@ -17,6 +17,7 @@ environment  = "dev"
 vault_cluster_size = 3
 instance_type     = "m5.large"
 vault_port        = 8200
+vault_version     = "1.20.0"  # Version of Vault to install
 
 # Connectivity Configuration
 enable_public_access = true  # Set to false for private-only access

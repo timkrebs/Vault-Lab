@@ -1,11 +1,21 @@
-# Data sources
+# Data sources - Use standard Amazon Linux 2 AMI
 data "aws_ami" "vault" {
   most_recent = true
-  owners      = ["self"]
+  owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["vault-amazonlinux2-vault*"]
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+  
+  filter {
+    name   = "root-device-type"
+    values = ["ebs"]
+  }
+  
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
   }
 }
 
@@ -156,10 +166,11 @@ resource "aws_launch_template" "vault" {
 
   user_data = base64encode(templatefile("${path.module}/../scripts/user_data.sh", {
     vault_cluster_size = var.vault_cluster_size
-    environment       = var.environment
-    kms_key_id        = aws_kms_key.vault.key_id
-    aws_region        = var.aws_region
-    vault_config      = base64encode(file("${path.module}/../files/vault.hcl"))
+    environment        = var.environment
+    kms_key_id         = aws_kms_key.vault.key_id
+    aws_region         = var.aws_region
+    vault_config       = base64encode(file("${path.module}/../files/vault.hcl"))
+    vault_version      = var.vault_version
   }))
 
   tag_specifications {
@@ -180,10 +191,10 @@ resource "aws_launch_template" "vault" {
 
 # Auto Scaling Group for Vault cluster
 resource "aws_autoscaling_group" "vault" {
-  name                = "${var.project_name}-vault-asg"
-  vpc_zone_identifier = var.subnet_ids
-  target_group_arns   = [aws_lb_target_group.vault.arn]
-  health_check_type   = "ELB"
+  name                      = "${var.project_name}-vault-asg"
+  vpc_zone_identifier       = var.subnet_ids
+  target_group_arns         = [aws_lb_target_group.vault.arn]
+  health_check_type         = "ELB"
   health_check_grace_period = 300
 
   min_size         = var.vault_cluster_size

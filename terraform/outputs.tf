@@ -56,7 +56,7 @@ output "vault_unseal_key_parameter" {
 
 output "vault_initialization_commands" {
   description = "Commands to retrieve Vault initialization data"
-  value = <<-EOT
+  value       = <<-EOT
     # Retrieve root token (requires AWS CLI and appropriate IAM permissions):
     aws ssm get-parameter --region ${var.aws_region} --name "/vault/${var.environment}/root-token" --with-decryption --query 'Parameter.Value' --output text
 
@@ -73,12 +73,12 @@ output "vault_initialization_commands" {
 output "vault_cluster_info" {
   description = "Information about the Vault cluster"
   value = {
-    cluster_size    = var.vault_cluster_size
-    environment     = var.environment
-    project_name    = var.project_name
-    aws_region      = var.aws_region
-    auto_unseal     = "KMS"
-    public_access   = var.enable_public_access
-    allowed_cidrs   = var.allowed_cidr_blocks
+    cluster_size  = var.vault_cluster_size
+    environment   = var.environment
+    project_name  = var.project_name
+    aws_region    = var.aws_region
+    auto_unseal   = "KMS"
+    public_access = var.enable_public_access
+    allowed_cidrs = var.allowed_cidr_blocks
   }
 } 

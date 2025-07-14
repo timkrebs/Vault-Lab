@@ -67,11 +67,12 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    # Install the latest version of Terraform CLI and configure for remote operations
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v1
       with:
         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+        terraform_wrapper: false  # Disable wrapper for better output handling
 
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
@@ -86,11 +87,16 @@ jobs:
     - name: Terraform Validate
       run: terraform validate
 
-    # Generates an execution plan for Terraform
+    # Generates an execution plan for Terraform (runs remotely in Terraform Cloud)
     - name: Terraform Plan
       run: terraform plan -input=false
+      env:
+        TF_IN_AUTOMATION: true
 
     # On push to "main", build or change infrastructure according to Terraform configuration files
+    # This runs remotely in Terraform Cloud where your AWS credentials are configured
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve -input=false 
+      run: terraform apply -auto-approve -input=false
+      env:
+        TF_IN_AUTOMATION: true 

@@ -75,11 +75,17 @@ variable "allowed_cidr_blocks" {
 variable "admin_cidr_blocks" {
   description = "CIDR blocks allowed SSH access to Vault instances"
   type        = list(string)
-  default     = ["0.0.0.0/0"]  # Restrict this in production
+  default     = ["0.0.0.0/0"] # Restrict this in production
 }
 
 variable "vault_port" {
   description = "Port for Vault API"
   type        = number
   default     = 8200
+}
+
+variable "vault_version" {
+  description = "Version of Vault to install"
+  type        = string
+  default     = "1.20.0"
 } 
